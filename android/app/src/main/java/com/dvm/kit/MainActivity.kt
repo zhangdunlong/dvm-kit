@@ -44,7 +44,14 @@ class MainActivity : AppCompatActivity() {
     private var pendingToken: String = ""
     /** 当前入口的 TOTP 密钥（青龙等开启两步验证的服务） */
     private var pendingTotp: String = ""
+    /** 配置缓存：自愈轮询每 1.5 秒跑一次，不必每次都过一遍 Keystore */
+    private var cfgCache: String? = null
     private val ui = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun cfg(): JSONObject {
+        val raw = cfgCache ?: prefs.load().also { cfgCache = it }
+        return runCatching { JSONObject(raw) }.getOrNull() ?: JSONObject()
+    }
 
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
@@ -128,10 +135,9 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView, url: String) {
                 bar.visibility = View.GONE
                 if (url.startsWith("file://")) return
-                // SPA 登录框往往晚于 onPageFinished 渲染，补两次重试
-                injectCredentials(view, url)
-                web.postDelayed({ injectCredentials(view, url) }, 1200)
-                web.postDelayed({ injectCredentials(view, url) }, 2800)
+                // 立即补一次，后续交给每 1.5 秒的轮询自愈
+                healForm()
+                web.postDelayed({ healForm() }, 800)
             }
         }
 
@@ -161,63 +167,99 @@ class MainActivity : AppCompatActivity() {
 
         web.loadUrl(HOME)
 
-        // 两步验证：进入远程页面后定时检查是否有验证码输入框需要填
-        ui.postDelayed(otpTick, 2000)
+        // 表单自愈轮询：补空字段、重试失败的提交、按窗口填两步验证码
+        ui.postDelayed(formTick, 1500)
     }
 
-    private fun injectCredentials(view: WebView, url: String) {
-        val cfg = runCatching { JSONObject(prefs.load()) }.getOrNull() ?: return
+    /**
+     * 自愈式表单填充。
+     *
+     * 不再是「加载时填一次」：登录失败后表单会被前端清空（例如青龙 2FA 同一
+     * 30 秒窗口内重复提交会返回 450 并被重置），一次性填充之后就再也不会补，
+     * 用户看到的就是「密码没自动填」。这里改为每次轮询只在字段为空时补，
+     * 并按 8 秒节流重试提交，让失败能自己恢复。
+     */
+    private fun healForm() {
+        val cfg = cfg()
         if (!cfg.optBoolean("autofill", true)) return
         val user = cfg.optString("user")
         val pass = cfg.optString("pass")
         val token = pendingToken.ifBlank { cfg.optString("token") }
-        if (user.isBlank() && pass.isBlank() && token.isBlank()) return
+        if (user.isBlank() && pass.isBlank() && token.isBlank() && pendingTotp.isBlank()) return
 
-        // 页面若存在令牌输入框（更新中心 / 仪表盘），只填令牌，绝不把面板密码填进去
+        // 两步验证码：剩余有效期不足 6 秒就留空，等下一个窗口再填，避免刚提交就过期
+        var code = ""
+        if (pendingTotp.isNotBlank()) {
+            val pair = runCatching { totp(pendingTotp) }.getOrNull()
+            if (pair != null && pair.second >= 6) code = pair.first
+        }
+
         val js = """
             (function(){
-              if (window.__dvmFilled) return;
+              var U=${JSONObject.quote(user)}, P=${JSONObject.quote(pass)};
+              var T=${JSONObject.quote(token)}, C=${JSONObject.quote(code)};
+              var now=Date.now();
+
               function setv(el,v){
                 var d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
                 if(d&&d.set){ d.set.call(el,v); } else { el.value=v; }
                 el.dispatchEvent(new Event('input',{bubbles:true}));
                 el.dispatchEvent(new Event('change',{bubbles:true}));
               }
-              var tokSel = 'input[name=token],#tok,input[placeholder*="令牌"],input[placeholder*="X-Console-Token"]';
-              var t = document.querySelector(tokSel);
-              if (t) {
-                var tv = ${JSONObject.quote(token)};
-                if (tv) { setv(t, tv); window.__dvmFilled = true; maybeSubmit(); }
+              function findBtn(re){
+                var bs=document.querySelectorAll('button, input[type=submit], input[type=button]');
+                for(var i=0;i<bs.length;i++){
+                  var tx=String(bs[i].innerText||bs[i].value||'').replace(/\s+/g,'');
+                  if(tx.length>0 && tx.length<=8 && re.test(tx)) return bs[i];
+                }
+                return null;
+              }
+              // 同一 key 8 秒内只点一次；验证码的 key 含码值，换窗口后自然可重试
+              function submit(key,re){
+                window.__dvmSent=window.__dvmSent||{};
+                var last=window.__dvmSent[key]||0;
+                if(now-last<8000) return;
+                var b=findBtn(re);
+                if(!b) return;
+                window.__dvmSent[key]=now;
+                b.click();
+              }
+
+              var RE_LOGIN=/^(登录|登入|进入|验证|确认|提交|确定|解锁)/;
+              var TOK='input[name=token],#tok,input[placeholder*="令牌"],input[placeholder*="X-Console-Token"]';
+              var OTP='input[placeholder*="位数字"],input[placeholder*="验证码"],input[autocomplete="one-time-code"]';
+
+              // 1) 令牌页（更新中心 / 仪表盘）：只填令牌，绝不把面板密码填进去
+              var tok=document.querySelector(TOK);
+              if(tok){
+                if(!T) return;
+                if(!tok.value) setv(tok,T);
+                if(tok.value===T) submit('tok',RE_LOGIN);
                 return;
               }
-              var p = document.querySelector('input[type=password]');
-              if (!p) return;
-              var u = document.querySelector('input[name=username]') ||
-                      document.querySelector('input[autocomplete=username]') ||
-                      document.querySelector('input[id=username]') ||
-                      document.querySelector('input[type=text]');
-              if (!u) return;
-              setv(u, ${JSONObject.quote(user)});
-              setv(p, ${JSONObject.quote(pass)});
-              window.__dvmFilled = true;
-              maybeSubmit();
 
-              function maybeSubmit(){
-                if (${JSONObject.quote(user)} === '' && ${JSONObject.quote(pass)} === '' &&
-                    ${JSONObject.quote(token)} === '') return;
-                if (window.__dvmClicked) return;
-                var btn = null, bs = document.querySelectorAll('button');
-                for (var i=0;i<bs.length;i++){
-                  var tx = (bs[i].innerText || '').replace(/\s+/g,'');
-                  if (/^(登录|登入|进入|验证|确认|提交|确定|解锁)/.test(tx) && tx.length <= 8) { btn = bs[i]; break; }
-                }
-                if (!btn) return;
-                window.__dvmClicked = 1;
-                setTimeout(function(){ btn.click(); }, 150);
+              // 2) 两步验证页：通常只有验证码框、没有密码框
+              var otp=document.querySelector(OTP);
+              var pw=document.querySelector('input[type=password]');
+              if(otp && !pw){
+                if(!C) return;
+                if(!otp.value) setv(otp,C);
+                if(otp.value===C) submit('otp:'+C,RE_LOGIN);
+                return;
               }
+
+              // 3) 账号密码页：用户名与密码各自独立补，缺一个不影响另一个
+              if(!pw) return;
+              if(P && !pw.value) setv(pw,P);
+              var u=document.querySelector('input[name=username]') ||
+                    document.querySelector('input[autocomplete=username]') ||
+                    document.querySelector('input[id=username]') ||
+                    document.querySelector('input[type=text]');
+              if(U && u && !u.value) setv(u,U);
+              if(pw.value===P && (!u || u.value===U)) submit('pw',RE_LOGIN);
             })();
         """.trimIndent()
-        view.evaluateJavascript(js, null)
+        web.evaluateJavascript(js, null)
     }
 
     private fun ping(base: String): Boolean {
@@ -248,52 +290,15 @@ class MainActivity : AppCompatActivity() {
         return (0 until a.length()).map { a.optString(it).trim() }.filter { it.isNotEmpty() }
     }
 
-    /** 两步验证：轮询页面是否出现验证码输入框，出现就填入当前 TOTP 并提交 */
-    private val otpTick = object : Runnable {
+    /** 表单自愈：远程页面每 1.5 秒检查一次，空字段补上、失败的提交按节流重试 */
+    private val formTick = object : Runnable {
         override fun run() {
             try {
-                fillOtpIfNeeded()
+                if (!web.url.orEmpty().startsWith("file://")) healForm()
             } catch (_: Exception) {
             }
             ui.postDelayed(this, 1500)
         }
-    }
-
-    private fun fillOtpIfNeeded() {
-        if (pendingTotp.isBlank()) return
-        if (web.url.orEmpty().startsWith("file://")) return
-        val pair = runCatching { totp(pendingTotp) }.getOrNull() ?: return
-        val code = pair.first
-        // 剩余有效期不足 6 秒就别提交，等下一个窗口，避免刚提交就过期
-        val ready = pair.second >= 6
-        val js = """
-            (function(){
-              var code = ${JSONObject.quote(code)};
-              var el = document.querySelector('input[placeholder*="位数字"]') ||
-                       document.querySelector('input[placeholder*="验证码"]') ||
-                       document.querySelector('input[autocomplete="one-time-code"]');
-              if (!el) return;
-              if (window.__dvmOtpVal === code) {
-                if ($ready && !window.__dvmOtpSent) { window.__dvmOtpSent = 1; submit(); }
-                return;
-              }
-              var d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-              if (d && d.set) { d.set.call(el, code); } else { el.value = code; }
-              el.dispatchEvent(new Event('input', {bubbles:true}));
-              el.dispatchEvent(new Event('change', {bubbles:true}));
-              window.__dvmOtpVal = code;
-              if ($ready && !window.__dvmOtpSent) { window.__dvmOtpSent = 1; submit(); }
-
-              function submit(){
-                var bs = document.querySelectorAll('button');
-                for (var i=0;i<bs.length;i++){
-                  var tx = (bs[i].innerText||'').replace(/\s+/g,'');
-                  if (tx === '验证' || tx === '确定' || tx === '提交') { bs[i].click(); return; }
-                }
-              }
-            })();
-        """.trimIndent()
-        web.evaluateJavascript(js, null)
     }
 
     /**
@@ -359,17 +364,19 @@ class MainActivity : AppCompatActivity() {
     inner class Bridge {
 
         @JavascriptInterface
-        fun getConfig(): String = prefs.load()
+        fun getConfig(): String = cfgCache ?: prefs.load().also { cfgCache = it }
 
         @JavascriptInterface
         fun saveConfig(json: String): Boolean {
             prefs.save(json)
+            cfgCache = json
             return true
         }
 
         @JavascriptInterface
         fun clearConfig() {
             prefs.clear()
+            cfgCache = null
         }
 
         /**
