@@ -1,0 +1,74 @@
+# ============================================================
+# DVM Kit · Caddy 配置模板
+# 复制为 Caddyfile 后按需修改，把 example.com 换成你的域名
+# ============================================================
+
+{
+	# 关闭 admin API：少一个本地攻击面，改配置后需重启进程生效
+	admin off
+
+	# 只走 TCP（UDP:443 若被占用可禁用 HTTP/3）
+	servers {
+		protocols h1 h2
+	}
+}
+
+# ------------------------------------------------------------
+# 证书方式二选一：
+#
+# ① HTTP-01（推荐，前提：公网 80 端口可被 Let's Encrypt 访问）
+#    什么都不要加，Caddy 自动申请。
+#
+# ② DNS-01（80 端口不通 / 只有 IPv6 / 用 Tunnel 时）
+#    在每个 site 块里加上：
+#      tls {
+#          dns cloudflare {env.CF_API_TOKEN}
+#          resolvers 8.8.8.8 1.1.1.1
+#          propagation_delay 15s
+#      }
+#    并保证启动 Caddy 的环境里有 CF_API_TOKEN（Zone.DNS.Edit 权限即可）
+# ------------------------------------------------------------
+
+# ===== 统一面板：更新中心 + 状态仪表盘 =====
+https://dash.example.com {
+	encode gzip
+
+	# 更新中心挂在子路径，其余交给仪表盘
+	handle_path /ag2a/* {
+		reverse_proxy 127.0.0.1:3077 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	reverse_proxy 127.0.0.1:8765 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	log {
+		output file /var/log/caddy/dash.log {
+			roll_size 5mb
+			roll_keep 3
+		}
+	}
+}
+
+# ===== 青龙面板 =====
+https://ql.example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:5700 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+# ===== AI 网关（可选）=====
+https://api.example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:3065 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+# ===== 纯内网调试用（不参与公网）=====
+# http://:8080 {
+# 	reverse_proxy 127.0.0.1:8765
+# }

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>项目更新中心 · Project Update Hub</title>
+<style>
+:root{--bg:#0b0e17;--card:rgba(255,255,255,.055);--line:rgba(255,255,255,.10);--txt:#e8ecf6;--sub:#8e99b3;--acc:#7c6cff;--acc2:#22d3ee;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;--radius:16px}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 700px at 15% -10%,#2a1f5c55,transparent),radial-gradient(900px 600px at 100% 0%,#0e4a5a44,transparent),var(--bg);color:var(--txt);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;padding:22px}
+.wrap{max-width:1120px;margin:0 auto}
+header{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-weight:800;font-size:17px;box-shadow:0 8px 26px #7c6cff44}
+h1{font-size:19px;margin:0;font-weight:650;letter-spacing:.3px}.sub{color:var(--sub);font-size:12px;margin-top:2px}
+.spacer{flex:1}.pill{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12px;color:var(--sub)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--sub)}.dot.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}.dot.off{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;backdrop-filter:blur(14px);box-shadow:0 10px 32px #0003}
+.card h2{font-size:13px;margin:0 0 14px;color:var(--sub);font-weight:600;letter-spacing:.6px;text-transform:uppercase}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.07);font-size:13px}.kv:last-child{border-bottom:0}.kv span:first-child{color:var(--sub)}.kv b{font-weight:600;word-break:break-all;text-align:right}
+.big{font-size:20px;font-weight:700;letter-spacing:.3px}.muted{color:var(--sub);font-size:12px}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button{font:inherit;color:var(--txt);background:var(--card);border:1px solid var(--line);padding:9px 15px;border-radius:10px;cursor:pointer;transition:.18s;font-weight:550}
+button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--acc);background:#7c6cff22}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:linear-gradient(135deg,var(--acc),#5b8cff);border-color:transparent;box-shadow:0 6px 20px #7c6cff44}
+button.danger{border-color:#f8717166;color:#ffc9c9}button.danger:hover{background:#f8717122;border-color:var(--bad)}
+button.sm{padding:5px 10px;font-size:12px;border-radius:8px}
+input,select,textarea{font:inherit;color:var(--txt);background:#0e1220;border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:none;width:100%}input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+input[type=checkbox]{width:auto;margin-right:6px;vertical-align:middle}
+label{display:block;color:var(--sub);font-size:12px;margin-bottom:5px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+.progress{height:8px;border-radius:99px;background:#ffffff12;overflow:hidden;margin:12px 0 6px}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .4s}
+pre{background:#080b13;border:1px solid var(--line);border-radius:12px;padding:14px;max-height:290px;overflow:auto;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#c9d4ea;white-space:pre-wrap;word-break:break-all}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600}.badge.ok{background:#34d39922;color:#7ff0c0}.badge.new{background:#fbbf2422;color:#ffd98a}.badge.bad{background:#f8717122;color:#ffb4b4}
+#toast{position:fixed;right:22px;bottom:22px;display:flex;flex-direction:column;gap:8px;z-index:9}
+.toast{background:#171c2c;border:1px solid var(--line);border-left:3px solid var(--acc);padding:11px 15px;border-radius:10px;box-shadow:0 10px 30px #0006;font-size:13px;max-width:360px}
+.toast.bad{border-left-color:var(--bad)}.toast.ok{border-left-color:var(--ok)}
+#gate{position:fixed;inset:0;background:#070a12ee;display:grid;place-items:center;z-index:20}.gate-box{width:min(380px,90vw);background:#141a2b;border:1px solid var(--line);border-radius:18px;padding:26px}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:9px 16px;border-radius:11px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:8px}
+.tab.on{background:linear-gradient(135deg,var(--acc),#5b8cff);border-color:transparent;box-shadow:0 6px 20px #7c6cff44}
+.tab.manage{border-style:dashed}
+.tagoff{color:var(--warn)}.tagon{color:var(--ok)}
+a{color:var(--acc2);text-decoration:none}
+.picon{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;background:#7c6cff33;font-size:10px;font-weight:700}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px}
+.form .full{grid-column:1/-1}
+.hint{background:#7c6cff17;border:1px solid #7c6cff44;border-radius:10px;padding:10px 13px;font-size:12px;color:#c9c2ff;margin:12px 0}
+.checks{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:12px;color:var(--sub)}
+.checks label{display:inline-flex;align-items:center;margin:0;color:var(--txt);font-size:12px}
+.prow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 0;border-bottom:1px dashed rgba(255,255,255,.08)}
+.prow:last-child{border-bottom:0}
+</style>
+</head>
+<body>
+<div id="gate"><div class="gate-box">
+  <h2 style="margin:0 0 8px;font-size:17px">🔐 项目更新中心</h2>
+  <p class="muted" style="margin:0 0 16px">输入部署时生成的访问令牌（保存在 /opt/ag2a-console/token）</p>
+  <label>访问令牌</label><input id="tok" type="password" placeholder="X-Console-Token" autocomplete="off">
+  <div class="btns"><button class="primary" onclick="saveToken()">进入控制台</button></div>
+  <p class="muted" id="gateErr" style="margin-top:10px;color:#ffb4b4"></p>
+</div></div>
+
+<div class="wrap">
+  <header>
+    <div class="logo">PU</div>
+    <div><h1 id="brand">项目更新中心</h1><div class="sub" id="subtitle">多项目统一更新 · 检查 / 更新 / 回滚 / 自动更新</div></div>
+    <div class="spacer"></div>
+    <div class="pill"><span class="dot" id="svcDot"></span><span id="svcTxt">连接中</span></div>
+    <div class="pill" id="clock">--:--</div>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <!-- 全局设置：上游通道 + 自动更新 -->
+  <div class="grid" id="globalCards">
+    <div class="card">
+      <h2>上游通道（全局，只作用于检查更新 / 下载）</h2>
+      <div class="row">
+        <div><label>代理地址（留空 = 直连）</label><input id="cfgProxy" placeholder="http://127.0.0.1:7890"></div>
+        <div><label>镜像下载源（多个用 ; 分隔）</label><input id="cfgMirrors" placeholder="https://gh-proxy.com/https://github.com/"></div>
+        <div><button onclick="saveConf()">保存通道配置</button></div>
+      </div>
+      <p class="muted" style="margin:12px 0 0">版本检查走 github.com 的 releases.atom；下载优先官方，失败自动试镜像。这两项只被本控制台读取，手机里的 clash / box_for_root 配置完全不动。</p>
+    </div>
+    <div class="card">
+      <h2>自动更新（对所有参与的项目生效）</h2>
+      <div class="row">
+        <div><label>开关</label><select id="autoOn"><option value="on">开启</option><option value="off">关闭</option></select></div>
+        <div><label>每日时间</label><input id="autoAt" type="time" value="04:00"></div>
+        <div><label>通道</label><select id="autoCh"><option value="beta">beta（含预发布）</option><option value="stable">stable（仅正式版）</option></select></div>
+        <div><button onclick="saveAuto()">保存设置</button></div>
+      </div>
+      <p class="muted" style="margin:12px 0 0">定时器常驻在控制台进程内；到点依次触发所有「启用 + 参与自动更新」的项目，失败自动回滚，无需智能体或面板登录态。</p>
+    </div>
+  </div>
+
+  <div id="viewProject"></div>
+  <div id="viewManage" style="display:none"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+let TOKEN = localStorage.getItem('puh_token') || '';
+let REG = null, PROJECTS = [], CUR = '', VIEW = 'project', TASK_RUNNING = false, EDIT_ID = '';
+const $ = id => document.getElementById(id);
+const esc = s => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const caps = p => (p && p.capabilities) || [];
+const has = (p,c) => caps(p).includes(c);
+
+function toast(msg, cls){ const d=document.createElement('div'); d.className='toast '+(cls||''); d.textContent=msg; $('toast').appendChild(d); setTimeout(()=>d.remove(),4500); }
+function saveToken(){ const v=$('tok').value.trim(); if(!v){$('gateErr').textContent='请输入令牌';return;} TOKEN=v; localStorage.setItem('puh_token',v); $('gate').style.display='none'; loadProjects(); }
+$('tok').addEventListener('keydown', e => { if(e.key==='Enter') saveToken(); });
+if(TOKEN) $('gate').style.display='none';
+
+async function api(path, opt){
+  const o = Object.assign({headers:{'X-Console-Token':TOKEN,'Content-Type':'application/json'},cache:'no-store'}, opt||{});
+  const r = await fetch(path, o);
+  if(r.status===401){ $('gate').style.display='grid'; $('gateErr').textContent='令牌无效或未授权'; throw new Error('unauthorized'); }
+  return r.json();
+}
+function dig(o, path){ return String(path||'').split('.').reduce((a,k)=> (a && typeof a==='object') ? a[k] : undefined, o); }
+function fmtVal(v, fmt){
+  if(v===undefined||v===null||v==='') return '—';
+  if(fmt==='size'){ const n=Number(v)||0; return n>1048576?(n/1048576).toFixed(1)+' MB':n>1024?(n/1024).toFixed(0)+' KB':n+' B'; }
+  if(fmt==='date') return esc(String(v).slice(0,10));
+  if(fmt==='update') return v==='1'?'<span class="badge new">有可用更新</span>':'<span class="badge ok">已是最新</span>';
+  if(fmt==='onoff') return v==='1'?'<span class="tagon">是 / 运行中</span>':'<span class="tagoff">否 / 已停用</span>';
+  if(fmt==='data') return v==='1'?'<span class="tagon">完整保留</span>':'<span class="tagoff">缺失</span>';
+  if(fmt==='prev') return v==='1'?'<span class="tagon">可回滚</span>':'<span class="muted">暂无</span>';
+  return esc(String(v));
+}
+function kvRows(fields, primary, fallback, start){
+  const off = start || 0;
+  return (fields||[]).map((f,i)=>{
+    let v = dig(primary, f.key);
+    if(v===undefined||v===null||v==='') v = dig(fallback, f.key);
+    return `<div class="kv"><span>${esc(f.label)}</span><b id="f${off+i}" class="${f.big?'big':''}">${fmtVal(v,f.fmt)}</b></div>`;
+  }).join('');
+}
+function setBusy(v){ ['btnCheck','btnUpdate','btnRollback','btnEnable','btnDisable','btnUpload'].forEach(i=>{ const e=$(i); if(e) e.disabled=v; }); }
+
+/* ---------------- 项目列表 ---------------- */
+async function loadProjects(){
+  $('clock').textContent = new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  try{
+    REG = await api('api/projects');
+    PROJECTS = REG.projects||[];
+    $('brand').textContent = REG.brand||'项目更新中心';
+    $('subtitle').textContent = REG.subtitle||'';
+    document.title = (REG.brand||'项目更新中心') + ' · Project Update Hub';
+    $('cfgProxy').value = (REG.config||{}).PROXY||'';
+    $('cfgMirrors').value = (REG.config||{}).MIRRORS||'';
+    const a=REG.auto||{}; $('autoOn').value=a.AUTO||'off'; $('autoAt').value=a.AT||'04:00'; $('autoCh').value=a.CHANNEL||'beta';
+    $('svcDot').className='dot on'; $('svcTxt').textContent = PROJECTS.length+' 个项目已加载';
+    renderTabs();
+    if(!PROJECTS.some(p=>p.id===CUR&&p.active!==false)) CUR = (PROJECTS.find(p=>p.active!==false)||{}).id||'';
+    if(VIEW==='manage') renderManage(); else if(CUR) switchProject(CUR); else { $('viewProject').innerHTML='<div class="card">暂无启用的项目，请到「项目管理」添加。</div>'; }
+  }catch(e){ $('svcTxt').textContent='控制台不可达'; $('svcDot').className='dot off'; }
+}
+function renderTabs(){
+  let h='';
+  PROJECTS.filter(p=>p.active!==false).forEach(p=>{
+    const s=p.summary||{};
+    const badge = s.has_update==='1' ? '<span class="badge new">新</span>' : '';
+    h += `<div class="tab ${CUR===p.id&&VIEW==='project'?'on':''}" onclick="switchProject('${esc(p.id)}')"><span class="picon">${esc(p.icon||'PJ')}</span>${esc(p.name)} ${badge}</div>`;
+  });
+  h += `<div class="tab manage ${VIEW==='manage'?'on':''}" onclick="openManage()">＋ 项目管理</div>`;
+  $('tabs').innerHTML=h;
+}
+function switchProject(id){ CUR=id; VIEW='project'; $('viewManage').style.display='none'; $('viewProject').style.display=''; $('globalCards').style.display=''; renderTabs(); renderProject(); refreshStatus(); }
+function openManage(){ VIEW='manage'; $('viewProject').style.display='none'; $('viewManage').style.display=''; $('globalCards').style.display='none'; renderTabs(); renderManage(); }
+
+/* ---------------- 项目详情 ---------------- */
+function renderProject(){
+  const p = PROJECTS.find(x=>x.id===CUR); if(!p) return;
+  const C = c => has(p,c);
+  let btns='';
+  if(C('check')) btns+=`<button class="primary" id="btnCheck" onclick="doCheck()">检查更新</button>`;
+  if(C('update')) btns+=`<button class="primary" id="btnUpdate" onclick="doUpdate()">立即更新</button>`;
+  if(C('rollback')) btns+=`<button class="danger" id="btnRollback" onclick="doRollback()">回滚上一版</button>`;
+  if(C('toggle')) btns+=`<button id="btnEnable" onclick="doToggle('enable')">启用服务</button><button id="btnDisable" onclick="doToggle('disable')">停用服务</button>`;
+  if(p.home) btns+=`<a href="${esc(p.home)}" target="_blank" rel="noopener"><button>上游主页 ↗</button></a>`;
+  const up = C('upload') ? `
+  <div class="card" style="margin-bottom:16px">
+    <h2>离线更新包（上游不可达时使用）</h2>
+    <div class="row">
+      <div><label>版本号，如 v3.5.0-beta.1</label><input id="upVer" placeholder="v3.5.0-beta.1"></div>
+      <div><label>官方发布包</label><input id="upFile" type="file"></div>
+      <div><button id="btnUpload" onclick="doUpload()">上传并设为待更新</button></div>
+    </div>
+    <p class="muted" style="margin:12px 0 0">上传后点「立即更新」。包只写入控制台目录并计算 sha256，更新时仍走备份 → 校验 → 替换 → 健康检查 → 失败回滚。</p>
+  </div>` : '';
+  $('viewProject').innerHTML = `
+  <div class="grid">
+    <div class="card"><h2>当前状态 · ${esc(p.name)}</h2>${kvRows(p.fields,{},{},0)}</div>
+    <div class="card"><h2>上游版本</h2>${kvRows(p.latest_fields,{},{},(p.fields||[]).length)}
+      <div class="btns">${btns}</div>
+      <p class="muted" style="margin:12px 0 0">${esc(p.notes||p.desc||'')}</p>
+    </div>
+    <div class="card"><h2>任务进度</h2>
+      <div class="kv"><span>当前步骤</span><b id="pstep">空闲</b></div>
+      <div class="progress"><div class="bar" id="pbar"></div></div>
+      <div class="muted" id="pmsg">没有正在运行的任务</div>
+      <div class="btns"><button onclick="refreshStatus()">刷新状态</button></div>
+    </div>
+  </div>
+  ${up}
+  <div class="grid">
+    <div class="card"><h2>实时日志 · ${esc(p.name)}</h2><pre id="logs">等待数据…</pre></div>
+    <div class="card"><h2>备份与回滚</h2><div id="backups" class="muted">加载中…</div>
+      <p class="muted" style="margin-top:14px">每次更新前自动备份；健康检查失败会自动恢复。点击备份可定点恢复。</p></div>
+  </div>
+  <p class="muted" style="text-align:center;margin-top:22px">项目 ${esc(p.id)} · 适配器 ${esc(p.adapter)} · 控制平面 /opt/ag2a-console · 所有 API 需令牌 · 仅监听回环地址</p>`;
+}
+
+async function refreshStatus(){
+  $('clock').textContent = new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  if(!CUR || VIEW!=='project') return;
+  const p = PROJECTS.find(x=>x.id===CUR); if(!p) return;
+  try{
+    const d = await api('api/p/'+encodeURIComponent(CUR)+'/status');
+    (p.fields||[]).forEach((f,i)=>{ const e=$('f'+i); if(e){ let v=dig(d,f.key); if(v===undefined||v===null||v==='') v=dig(d.latest,f.key); e.innerHTML=fmtVal(v,f.fmt); } });
+    const off=(p.fields||[]).length;
+    (p.latest_fields||[]).forEach((f,i)=>{ const e=$('f'+(off+i)); if(e){ let v=dig(d.latest,f.key); if(v===undefined||v===null||v==='') v=dig(d,f.key); e.innerHTML=fmtVal(v,f.fmt); } });
+    const pr=d.progress||{}; $('pstep').textContent=pr.step||'空闲'; $('pbar').style.width=(Number(pr.percent)||0)+'%'; $('pmsg').textContent=pr.message||'没有正在运行的任务';
+    $('logs').textContent=(d.logs||[]).join('\n')||'（暂无日志）';
+    const bs=d.backups||[]; $('backups').innerHTML = bs.length ? bs.map(b=>`<div class="kv"><span>${esc(b)}</span><button class="sm" onclick="rollbackTo('${esc(b)}')">恢复</button></div>`).join('') : '<span class="muted">暂无备份</span>';
+    const t=d.task||{}; TASK_RUNNING=!!t.running; setBusy(TASK_RUNNING);
+    if(t.running) $('pstep').textContent=(pr.step||'running')+' · 进行中';
+    else if(t.result==='failed') $('pmsg').textContent='上次任务失败：'+(t.error||'查看日志');
+    else if(t.result==='no_update') $('pmsg').textContent='当前已是最新版本，无需更新';
+  }catch(e){ $('logs').textContent='控制台不可达：'+e.message; }
+}
+
+async function doCheck(){ setBusy(true); try{ const r=await api('api/p/'+CUR+'/check',{method:'POST',body:'{}'}); toast(r.ok?'检查完成':'检查失败：'+String(r.output||'').slice(-120), r.ok?'ok':'bad'); }catch(e){toast('请求失败','bad');} finally{ await loadProjects(); refreshStatus(); } }
+async function doUpdate(){ if(!confirm('确认执行更新？将自动备份，失败会自动回滚。')) return; setBusy(true); toast('更新任务已启动'); try{ await api('api/p/'+CUR+'/update',{method:'POST',body:'{}'}); }catch(e){toast('请求失败','bad');} setTimeout(refreshStatus,900); }
+async function doRollback(){ if(!confirm('确认回滚到最近一次备份？')) return; setBusy(true); try{ await api('api/p/'+CUR+'/rollback',{method:'POST',body:'{}'}); toast('回滚任务已启动'); }catch(e){toast('请求失败','bad');} setTimeout(refreshStatus,900); }
+async function rollbackTo(id){ if(!confirm('确认恢复备份 '+id+' ？')) return; try{ await api('api/p/'+CUR+'/rollback',{method:'POST',body:JSON.stringify({backup:id})}); toast('回滚任务已启动'); }catch(e){toast('请求失败','bad');} setTimeout(refreshStatus,900); }
+async function doToggle(a){ if(!confirm(a==='enable'?'确认启用该服务？':'确认停用该服务？（配置与数据保留）')) return; setBusy(true); try{ await api('api/p/'+CUR+'/toggle',{method:'POST',body:JSON.stringify({action:a})}); toast('任务已启动'); }catch(e){toast('请求失败','bad');} setTimeout(refreshStatus,900); }
+async function doUpload(){
+  const f=$('upFile').files[0], v=$('upVer').value.trim();
+  if(!f||!v){ toast('请选择包并填写版本号','bad'); return; }
+  $('btnUpload').disabled=true; toast('上传中 '+(f.size/1048576).toFixed(1)+' MB');
+  try{
+    const r=await fetch('api/p/'+CUR+'/upload',{method:'POST',headers:{'X-Console-Token':TOKEN,'X-Console-Version':v,'Content-Type':'application/octet-stream'},body:f});
+    const d=await r.json();
+    if(d.ok){ toast('已就绪 '+d.version+'，可点「立即更新」','ok'); refreshStatus(); }
+    else toast('上传失败：'+(d.error||r.status),'bad');
+  }catch(e){ toast('上传失败','bad'); }
+  finally{ $('btnUpload').disabled=false; }
+}
+async function saveConf(){
+  try{ const d=await api('api/config',{method:'POST',body:JSON.stringify({PROXY:$('cfgProxy').value.trim(),MIRRORS:$('cfgMirrors').value.trim()})}); toast(d.ok?'上游通道已保存':'保存失败：'+(d.message||''), d.ok?'ok':'bad'); }
+  catch(e){ toast('保存失败','bad'); }
+}
+async function saveAuto(){
+  try{
+    await api('api/auto',{method:'POST',body:JSON.stringify({cmd:$('autoOn').value})});
+    await api('api/auto',{method:'POST',body:JSON.stringify({cmd:$('autoAt').value})});
+    await api('api/auto',{method:'POST',body:JSON.stringify({cmd:$('autoCh').value})});
+    toast('自动更新设置已保存','ok');
+  }catch(e){ toast('保存失败','bad'); }
+  loadProjects();
+}
+
+/* ---------------- 项目管理 ---------------- */
+const ALL_CAPS = [
+  ['check','检查更新'],['update','立即更新'],['rollback','回滚'],['upload','离线上传'],
+  ['toggle','服务启停'],['auto','参与定时更新'],['logs','日志'],['backups','备份列表']
+];
+function blankProject(){ return {id:'',name:'',icon:'',desc:'',home:'',notes:'',adapter:'generic',ctl:'generic_ctl.py',ctl_type:'python3',
+  repo:'',channel:'stable',asset:'',package:'raw',member:'',target:'',min_size:1000000,require_elf:true,
+  version_file:'',version_cmd:'',stop_cmd:'',start_cmd:'',health_url:'',
+  capabilities:['check','update','rollback','upload','toggle','auto','logs'],active:true,builtin:false}; }
+function renderManage(listOnly){
+  const rows = PROJECTS.map((p,i)=>`
+    <div class="prow">
+      <span class="picon">${esc(p.icon||'PJ')}</span>
+      <div style="min-width:180px;flex:1"><b>${esc(p.name)}</b> <span class="muted">${esc(p.id)}</span>
+        <div class="muted">${esc(p.adapter)} · ${esc(p.repo||p.desc||'')}</div></div>
+      <span class="badge ${p.active!==false?'ok':'bad'}">${p.active!==false?'启用':'停用'}</span>
+      ${p.builtin?'<span class="badge ok">内置</span>':''}
+      <button class="sm" onclick="editProject('${esc(p.id)}')">编辑</button>
+      <button class="sm" onclick="moveProject('${esc(p.id)}','up')">↑</button>
+      <button class="sm" onclick="moveProject('${esc(p.id)}','down')">↓</button>
+      <button class="sm" onclick="activeProject('${esc(p.id)}',${p.active!==false?'false':'true'})">${p.active!==false?'停用':'启用'}</button>
+      ${p.builtin?'':`<button class="sm danger" onclick="removeProject('${esc(p.id)}')">删除</button>`}
+    </div>`).join('');
+  $('viewManage').innerHTML = `
+  <div class="card" style="margin-bottom:16px"><h2>已注册项目（${PROJECTS.length}）</h2>${rows||'<div class="muted">暂无项目</div>'}
+    <div class="btns"><button class="primary" onclick="editProject('')">＋ 添加项目</button><button class="danger" onclick="resetProjects()">恢复默认注册表</button></div>
+    <div class="hint">新增项目默认使用「通用模板」：只需填 GitHub 仓库、release 资产名、目标文件路径，就能走完整的
+    查版本 → 下载 → sha256 → 备份 → 原子替换 → 健康检查 → 失败回滚流水线。高级场景可选「自定义脚本」，
+    自己实现 status / check / update / rollback / enable / disable 的 key=value 命令协议。</div>
+  </div>
+  <div id="editor"></div>`;
+  if(EDIT_ID!==''||listOnly==='new') renderEditor();
+}
+function renderEditor(){
+  const p = EDIT_ID ? PROJECTS.find(x=>x.id===EDIT_ID) : blankProject();
+  if(!p) return;
+  const builtin = !!p.builtin;
+  const val = (k,d) => esc(p[k]===undefined||p[k]===null||p[k]===''? (d||'') : p[k]);
+  const fld = (id,label,v,ph,type) => `<div><label>${label}</label><input id="${id}" ${type?`type="${type}"`:''} value="${v}" placeholder="${esc(ph||'')}"></div>`;
+  const gen = builtin ? '<div class="hint full">内置项目使用专用控制器，只能修改显示信息、能力与启停状态；更新逻辑与文件路径不可改。</div>' : `
+    <div><label>适配器</label><select id="eAdapter" onchange="adapterChanged()"><option value="generic" ${p.adapter==='generic'?'selected':''}>通用模板（配置驱动）</option><option value="custom" ${p.adapter==='custom'?'selected':''}>自定义脚本（命令协议）</option></select></div>
+    <div id="eCtlWrap" style="display:${p.adapter==='custom'?'':'none'}"><label>控制器文件名（放在 /opt/ag2a-console 下）</label><input id="eCtl" value="${val('ctl')}" placeholder="my_ctl.py"></div>
+    ${fld('eRepo','GitHub 仓库 owner/name',val('repo'),'owner/repo')}
+    <div><label>版本通道</label><select id="eChannel"><option value="stable" ${p.channel==='stable'?'selected':''}>stable（仅正式版）</option><option value="beta" ${p.channel==='beta'?'selected':''}>beta（含预发布）</option></select></div>
+    ${fld('eAsset','release 资产名（支持 {tag} {ver} {arch}）',val('asset'),'app-linux-arm64.tar.gz')}
+    <div><label>包类型</label><select id="ePackage">${['raw','tar.gz','zip'].map(x=>`<option value="${x}" ${p.package===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    ${fld('eMember','包内目标文件（tar/zip 时填，留空自动匹配）',val('member'),'app')}
+    ${fld('eTarget','目标文件绝对路径',val('target'),'/opt/myapp/app')}
+    ${fld('eMin','最小体积（字节）',val('min_size','1000000'),'1000000')}
+    <div><label>要求 ELF 可执行文件</label><select id="eElf"><option value="true" ${p.require_elf!==false?'selected':''}>是（二进制）</option><option value="false" ${p.require_elf===false?'selected':''}>否（脚本 / 其它）</option></select></div>
+    ${fld('eVersionFile','本地版本戳文件（留空自动管理）',val('version_file'),'/opt/myapp/VERSION')}
+    ${fld('eVersionCmd','读取本地版本的命令（可选）',val('version_cmd'),'cat /opt/myapp/VERSION')}
+    ${fld('eStop','停止服务命令（可选）',val('stop_cmd'),'pkill -f myapp')}
+    ${fld('eStart','启动服务命令（可选）',val('start_cmd'),'nohup /opt/myapp/app &')}
+    ${fld('eHealth','健康检查 URL（可选，失败自动回滚）',val('health_url'),'http://127.0.0.1:8080/health')}
+    <div class="hint full">target 只允许 /opt、/app、/data/local、/usr/local/bin、/root、/srv 下的绝对路径；
+    禁止覆盖控制台自身与系统目录。stop/start 命令禁止换行与 rm -rf。替换前必定备份到 work/backups。</div>`;
+  $('editor').innerHTML = `
+  <div class="card"><h2>${builtin?'编辑内置项目':(EDIT_ID?'编辑项目':'添加项目')}</h2>
+    <div class="form">
+      ${fld('eId','项目 ID（英文小写，创建后不可改）',val('id'),'myapp')}
+      ${fld('eName','显示名称',val('name'),'我的服务')}
+      ${fld('eIcon','图标文字（1-4 字符）',val('icon'),'MY')}
+      ${fld('eHome','上游主页（可选）',val('home'),'https://github.com/owner/repo/releases')}
+      <div class="full"><label>简介</label><input id="eDesc" value="${val('desc')}" placeholder="一句话说明"></div>
+      <div class="full"><label>备注（显示在操作卡片里）</label><input id="eNotes" value="${val('notes')}" placeholder="更新注意事项"></div>
+      ${gen}
+      <div class="full"><label>能力</label><div class="checks">${ALL_CAPS.map(([k,n])=>`<label><input type="checkbox" id="cap_${k}" ${has(p,k)?'checked':''}>${n}</label>`).join('')}</div></div>
+      <div class="full"><label><input type="checkbox" id="eActive" ${p.active!==false?'checked':''}> 启用该项目（在面板显示、参与自动更新）</label></div>
+    </div>
+    <div class="btns"><button class="primary" onclick="saveProject()">保存项目</button><button onclick="cancelEdit()">取消</button></div>
+    <p class="muted" id="editorErr" style="margin-top:10px;color:#ffb4b4"></p>
+  </div>`;
+  const idEl=$('eId'); if(idEl&&builtin) idEl.disabled=true;
+}
+function adapterChanged(){ const w=$('eCtlWrap'); if(w) w.style.display = $('eAdapter').value==='custom'?'':'none'; }
+function editProject(id){ EDIT_ID=id; renderManage('new'); $('editor').scrollIntoView({behavior:'smooth'}); }
+function cancelEdit(){ EDIT_ID=''; $('editor').innerHTML=''; }
+async function saveProject(){
+  const builtin = EDIT_ID ? !!(PROJECTS.find(x=>x.id===EDIT_ID)||{}).builtin : false;
+  const old = EDIT_ID ? PROJECTS.find(x=>x.id===EDIT_ID) : null;
+  const q = Object.assign({}, old||blankProject(), {
+    id: ($('eId')?$('eId').value:'').trim() || (old?old.id:''),
+    name: $('eName').value.trim(), icon: $('eIcon').value.trim(),
+    desc: $('eDesc').value.trim(), home: $('eHome').value.trim(), notes: $('eNotes').value.trim(),
+    active: $('eActive').checked,
+    capabilities: ALL_CAPS.map(([k])=>k).filter(k=>$('cap_'+k)&&$('cap_'+k).checked)
+  });
+  if(!builtin){
+    q.adapter=$('eAdapter').value; q.ctl=$('eAdapter').value==='generic'?'generic_ctl.py':$('eCtl').value.trim();
+    q.ctl_type=$('eAdapter').value==='generic'?'python3':(q.ctl.endsWith('.sh')?'sh':'python3');
+    q.repo=$('eRepo').value.trim(); q.asset=$('eAsset').value.trim();
+    q.member=$('eMember').value.trim(); q.target=$('eTarget').value.trim();
+    q.min_size=Number($('eMin').value)||1000000; q.require_elf=$('eElf').value==='true';
+    q.version_file=$('eVersionFile').value.trim(); q.version_cmd=$('eVersionCmd').value.trim();
+    q.stop_cmd=$('eStop').value.trim(); q.start_cmd=$('eStart').value.trim();
+    q.health_url=$('eHealth').value.trim(); q.channel=$('eChannel').value; q.package=$('ePackage').value;
+  }
+  try{
+    const r=await api('api/projects',{method:'POST',body:JSON.stringify({action:EDIT_ID?'update':'add',project:q})});
+    if(!r.ok){ $('editorErr').textContent=r.message||'保存失败'; toast('保存失败：'+(r.message||''),'bad'); return; }
+    toast('项目已保存','ok'); EDIT_ID=''; await loadProjects(); renderManage();
+  }catch(e){ toast('保存失败','bad'); }
+}
+async function removeProject(id){ if(!confirm('确认删除项目 '+id+' ？只删除控制台里的注册信息，不会删除手机上的任何文件。')) return;
+  try{ const r=await api('api/projects',{method:'POST',body:JSON.stringify({action:'remove',id})}); toast(r.ok?'已删除':'删除失败：'+(r.message||''), r.ok?'ok':'bad'); await loadProjects(); renderManage(); }catch(e){toast('请求失败','bad');} }
+async function activeProject(id,on){ try{ const r=await api('api/projects',{method:'POST',body:JSON.stringify({action:on?'activate':'deactivate',id})}); toast(r.ok?'已更新':'操作失败','ok'); await loadProjects(); renderManage(); }catch(e){toast('请求失败','bad');} }
+async function moveProject(id,dir){ try{ await api('api/projects',{method:'POST',body:JSON.stringify({action:dir,id})}); await loadProjects(); renderManage(); }catch(e){toast('请求失败','bad');} }
+async function resetProjects(){ if(!confirm('确认恢复默认注册表？自定义项目会被移除（不会删除手机上的文件）。')) return;
+  try{ const r=await api('api/projects',{method:'POST',body:JSON.stringify({action:'reset'})}); toast(r.ok?'已恢复默认':'失败','ok'); EDIT_ID=''; await loadProjects(); renderManage(); }catch(e){toast('请求失败','bad');} }
+
+setInterval(()=>{ if(VIEW==='project' && !TASK_RUNNING) refreshStatus(); }, 15000);
+setInterval(()=>{ if(VIEW==='project' && TASK_RUNNING) refreshStatus(); }, 2500);
+loadProjects();
+</script>
+</body>
+</html>

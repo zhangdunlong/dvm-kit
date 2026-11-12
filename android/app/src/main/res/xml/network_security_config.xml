@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  内网面板普遍是 http://192.168.x.x:port，因此必须放行明文流量。
+  同时信任用户安装的 CA，方便自签证书的用户。
+  如果你只走公网 HTTPS，可把 cleartextTrafficPermitted 改为 false。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

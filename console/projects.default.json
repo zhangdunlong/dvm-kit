@@ -1,0 +1,194 @@
+{
+  "version": 3,
+  "brand": "项目更新中心",
+  "subtitle": "多项目统一更新 · 检查 / 下载 / 备份 / 替换 / 回滚 / 定时",
+  "projects": [
+    {
+      "id": "agent2api",
+      "name": "Agent2API 网关",
+      "desc": "DroidVM chroot 内的 AI 网关，单体二进制 + ui + 数据库",
+      "icon": "AG",
+      "adapter": "agent2api",
+      "ctl": "updatectl.sh",
+      "ctl_type": "sh",
+      "repo": "aimod-cc/Agent2API",
+      "home": "https://github.com/aimod-cc/Agent2API/releases",
+      "capabilities": ["check", "update", "rollback", "upload", "auto", "backups", "logs"],
+      "latest_file": "latest",
+      "log_file": "update.log",
+      "progress_file": "progress",
+      "state_file": "state",
+      "fields": [
+        {"key": "version", "label": "当前版本", "fmt": "text", "big": true},
+        {"key": "binary_size", "label": "运行体大小", "fmt": "size"},
+        {"key": "ui_files", "label": "前端文件数", "fmt": "text"},
+        {"key": "port", "label": "服务端口", "fmt": "text"},
+        {"key": "db_size", "label": "数据库大小", "fmt": "size"}
+      ],
+      "latest_fields": [
+        {"key": "version", "label": "最新版本", "fmt": "text", "big": true},
+        {"key": "published", "label": "发布时间", "fmt": "date"},
+        {"key": "has_update", "label": "更新判定", "fmt": "update"},
+        {"key": "state.last_result", "label": "上次结果", "fmt": "text"}
+      ],
+      "notes": "更新会备份运行体、前端、插件与 SQLite 一致性快照（含 WAL）；健康检查失败自动回滚。",
+      "builtin": true,
+      "active": true
+    },
+    {
+      "id": "wb2api",
+      "name": "WorkBuddy2API",
+      "desc": "Android 层 Magisk 模块，经 /proc/1/root 跨层管理",
+      "icon": "WB",
+      "adapter": "wb2api",
+      "ctl": "wb2api_ctl.py",
+      "ctl_type": "python3",
+      "repo": "misakano7545/workbuddy2api-panel",
+      "home": "https://github.com/misakano7545/workbuddy2api-panel/releases",
+      "capabilities": ["check", "update", "rollback", "toggle", "logs"],
+      "latest_file": "wb-latest",
+      "log_file": "wb2api.log",
+      "progress_file": "progress.wb",
+      "fields": [
+        {"key": "version", "label": "当前版本", "fmt": "text", "big": true},
+        {"key": "running", "label": "运行状态", "fmt": "onoff"},
+        {"key": "enabled", "label": "开机自启", "fmt": "onoff"},
+        {"key": "binary_size", "label": "二进制大小", "fmt": "size"},
+        {"key": "data_present", "label": "配置与密钥", "fmt": "data"},
+        {"key": "prev_available", "label": "可回滚版本", "fmt": "prev"}
+      ],
+      "latest_fields": [
+        {"key": "version", "label": "最新版本", "fmt": "text", "big": true},
+        {"key": "has_update", "label": "更新判定", "fmt": "update"},
+        {"key": "source", "label": "版本来源", "fmt": "text"}
+      ],
+      "notes": "只替换 payload/wb2api 与版本标记；服务当前停用时，更新后绝不偷偷拉起。配置与数据一律保留。",
+      "builtin": true,
+      "active": true
+    },
+    {
+      "id": "cloudflared",
+      "name": "cloudflared 隧道",
+      "desc": "Cloudflare Tunnel 客户端，公网入口的隧道腿",
+      "icon": "CF",
+      "adapter": "generic",
+      "ctl": "generic_ctl.py",
+      "ctl_type": "python3",
+      "repo": "cloudflare/cloudflared",
+      "home": "https://github.com/cloudflare/cloudflared/releases",
+      "asset": "cloudflared-linux-arm64",
+      "package": "raw",
+      "target": "/usr/local/bin/cloudflared",
+      "min_size": 20000000,
+      "require_elf": true,
+      "channel": "stable",
+      "version_cmd": "/usr/local/bin/cloudflared --version | awk '{print $3}'",
+      "health_cmd": "/usr/bin/curl -fsS --noproxy '*' --max-time 6 http://127.0.0.1:20241/metrics -o /dev/null",
+      "pid_pattern": "cloudflared --config",
+      "stop_cmd": "pkill -f \"[c]loudflared --config\"",
+      "start_cmd": "setsid nohup /etc/cloudflared/run-tunnel.sh >> /tmp/cf.log 2>&1 < /dev/null &",
+      "capabilities": ["check", "update", "rollback", "upload", "auto", "backups", "logs"],
+      "fields": [
+        {"key": "version", "label": "当前版本", "fmt": "text", "big": true},
+        {"key": "running", "label": "运行状态", "fmt": "onoff"},
+        {"key": "binary_size", "label": "二进制大小", "fmt": "size"},
+        {"key": "prev_available", "label": "可回滚版本", "fmt": "prev"}
+      ],
+      "latest_fields": [
+        {"key": "version", "label": "最新版本", "fmt": "text", "big": true},
+        {"key": "published", "label": "发布时间", "fmt": "date"},
+        {"key": "has_update", "label": "更新判定", "fmt": "update"}
+      ],
+      "notes": "更新后自动重启隧道并用 20241/metrics 探活；失败自动回滚二进制。重启期间隧道域名（api4/dash4 等）会短暂中断 5~15 秒。",
+      "active": true
+    },
+    {
+      "id": "caddy",
+      "name": "Caddy 反代",
+      "desc": "443 HTTPS 统一入口，IPv6 直连域名的证书与路由",
+      "icon": "CD",
+      "adapter": "generic",
+      "ctl": "generic_ctl.py",
+      "ctl_type": "python3",
+      "repo": "caddyserver/caddy",
+      "home": "https://github.com/caddyserver/caddy/releases",
+      "asset": "caddy_{ver}_linux_arm64.tar.gz",
+      "package": "tar.gz",
+      "member": "caddy",
+      "target": "/usr/local/bin/caddy",
+      "min_size": 30000000,
+      "require_elf": true,
+      "channel": "stable",
+      "version_cmd": "/usr/local/bin/caddy version | awk '{print $1}'",
+      "health_cmd": "/usr/bin/curl -fsSk --max-time 6 --resolve v6.example.com:443:127.0.0.1 https://v6.example.com/ -o /dev/null",
+      "pid_pattern": "caddy run",
+      "stop_cmd": "pkill -f \"[c]addy run\"",
+      "start_cmd": "set -a; . /etc/caddy/caddy.env; set +a; setsid nohup /usr/local/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile >> /var/log/caddy/caddy.out 2>&1 < /dev/null &",
+      "capabilities": ["check", "update", "rollback", "upload", "auto", "backups", "logs"],
+      "fields": [
+        {"key": "version", "label": "当前版本", "fmt": "text", "big": true},
+        {"key": "running", "label": "运行状态", "fmt": "onoff"},
+        {"key": "binary_size", "label": "二进制大小", "fmt": "size"},
+        {"key": "prev_available", "label": "可回滚版本", "fmt": "prev"}
+      ],
+      "latest_fields": [
+        {"key": "version", "label": "最新版本", "fmt": "text", "big": true},
+        {"key": "published", "label": "发布时间", "fmt": "date"},
+        {"key": "has_update", "label": "更新判定", "fmt": "update"}
+      ],
+      "notes": "注意：Caddy 是 443 的总入口，重启期间所有 HTTPS 域名（含本面板 /ag2a/）会中断约 3~5 秒。更新失败会自动回滚二进制，但若进程未能拉起需用 adb 手动启动。依赖 /etc/caddy/caddy.env 提供 CF_API_TOKEN。",
+      "active": true
+    },
+    {
+      "id": "qinglong",
+      "name": "青龙面板",
+      "desc": "定时任务面板 2.x，更新需走官方 ql update",
+      "icon": "QL",
+      "adapter": "custom",
+      "ctl": "misc_ctl.py",
+      "ctl_type": "python3",
+      "repo": "whyour/qinglong",
+      "home": "https://github.com/whyour/qinglong/releases",
+      "local_kind": "yaml",
+      "local_file": "/ql/version.yaml",
+      "channel": "stable",
+      "capabilities": ["check", "logs"],
+      "fields": [
+        {"key": "version", "label": "当前版本", "fmt": "text", "big": true},
+        {"key": "note", "label": "更新方式", "fmt": "text"}
+      ],
+      "latest_fields": [
+        {"key": "version", "label": "最新版本", "fmt": "text", "big": true},
+        {"key": "published", "label": "发布时间", "fmt": "date"},
+        {"key": "has_update", "label": "更新判定", "fmt": "update"}
+      ],
+      "notes": "只做版本检查，不提供自动更新：官方 ql update 会重建 node_modules 与前端，现有 30+ 任务的运行环境有被破坏的风险。需要升级时建议先导出数据与脚本，再人工执行。",
+      "active": true
+    },
+    {
+      "id": "nodejs",
+      "name": "Node.js 运行时",
+      "desc": "青龙 / mi-paiai 等常驻服务的运行时，仅跟踪同主版本",
+      "icon": "JS",
+      "adapter": "custom",
+      "ctl": "misc_ctl.py",
+      "ctl_type": "python3",
+      "src_kind": "nodejs_dist",
+      "same_major": true,
+      "channel": "stable",
+      "version_cmd": "/usr/local/bin/node --version",
+      "capabilities": ["check", "logs"],
+      "fields": [
+        {"key": "version", "label": "当前版本", "fmt": "text", "big": true},
+        {"key": "binary_size", "label": "运行时大小", "fmt": "size"}
+      ],
+      "latest_fields": [
+        {"key": "version", "label": "同主版本最新", "fmt": "text", "big": true},
+        {"key": "published", "label": "发布时间", "fmt": "date"},
+        {"key": "has_update", "label": "更新判定", "fmt": "update"}
+      ],
+      "notes": "只检查同主版本（当前 22.x）的最新发行版，不跨主版本。替换 node 会同时影响青龙、mi-paiai 等多个常驻服务，故不提供一键更新。",
+      "active": true
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0a14">
+<title>DVM 控制台</title>
+<style>
+  :root{
+    --bg:#0b0a14; --card:rgba(255,255,255,.055); --line:rgba(255,255,255,.10);
+    --txt:#eceaf6; --dim:#9a93b8; --pur:#a855f7; --pink:#ec4899;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --cy:#38bdf8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0;padding:18px 16px 96px;color:var(--txt);
+    font-family:-apple-system,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);
+    background-image:
+      radial-gradient(900px 420px at 10% -8%,rgba(168,85,247,.22),transparent 62%),
+      radial-gradient(760px 380px at 95% 2%,rgba(236,72,153,.16),transparent 60%),
+      radial-gradient(900px 500px at 50% 110%,rgba(56,189,248,.10),transparent 60%);
+    background-attachment:fixed;
+  }
+  .wrap{max-width:560px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  h1{font-size:19px;margin:0;letter-spacing:.4px;
+     background:linear-gradient(92deg,#c084fc,#f472b6);-webkit-background-clip:text;
+     background-clip:text;color:transparent}
+  .net{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:99px;background:#4b4560;transition:.2s}
+  .dot.on{background:var(--ok);box-shadow:0 0 9px rgba(52,211,153,.8)}
+  .dot.wan{background:var(--cy);box-shadow:0 0 9px rgba(56,189,248,.8)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:15px 16px;margin-bottom:12px;backdrop-filter:blur(14px)}
+  .card h2{font-size:12px;color:var(--dim);margin:0 0 12px;font-weight:500;letter-spacing:.5px}
+  .field{margin-bottom:11px}
+  .field:last-child{margin-bottom:0}
+  label{display:block;font-size:11.5px;color:var(--dim);margin-bottom:5px}
+  input[type=text],input[type=password]{
+    width:100%;padding:11px 12px;border-radius:11px;border:1px solid var(--line);
+    background:rgba(0,0,0,.28);color:var(--txt);font-size:13px;outline:none;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+  }
+  input:focus{border-color:rgba(168,85,247,.6);box-shadow:0 0 0 3px rgba(168,85,247,.14)}
+  .row{display:flex;gap:9px;margin-top:13px}
+  button{flex:1;padding:11px;border:0;border-radius:11px;font-size:13.5px;font-weight:600;
+         cursor:pointer;font-family:inherit;color:#fff;
+         background:linear-gradient(135deg,#a855f7,#ec4899)}
+  button.ghost{background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--txt);font-weight:500}
+  button:active{opacity:.8}
+  .sw{display:flex;align-items:center;justify-content:space-between;padding:9px 0;font-size:13px}
+  .sw input{width:44px;height:24px;appearance:none;background:rgba(255,255,255,.15);
+            border-radius:99px;position:relative;outline:none;transition:.2s}
+  .sw input:checked{background:linear-gradient(135deg,#a855f7,#ec4899)}
+  .sw input::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;
+                   border-radius:99px;background:#fff;transition:.2s}
+  .sw input:checked::after{transform:translateX(20px)}
+
+  .svc{display:flex;align-items:center;gap:12px;padding:14px 15px;border-radius:14px;
+       border:1px solid var(--line);background:var(--card);margin-bottom:10px;
+       cursor:pointer;transition:.15s}
+  .svc:active{transform:scale(.985);opacity:.85}
+  .svc .ic{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:flex;
+           align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff}
+  .svc .tx{flex:1;min-width:0}
+  .svc .nm{font-size:14px;font-weight:600;margin-bottom:2px}
+  .svc .ds{font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .svc .go{font-size:11.5px;color:var(--pur);flex:0 0 auto}
+  .svc.dim{opacity:.5}
+  .hint{font-size:11px;color:var(--dim);line-height:1.6;margin-top:8px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);
+         background:rgba(28,22,46,.96);border:1px solid var(--line);color:var(--txt);
+         padding:11px 18px;border-radius:12px;font-size:13px;opacity:0;
+         transition:.22s;pointer-events:none;z-index:99;max-width:86vw;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .sep{height:1px;background:var(--line);margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>DVM 控制台</h1>
+    <div class="net"><span class="dot" id="dot"></span><span id="netText">未探测</span></div>
+  </header>
+
+  <div class="card">
+    <h2>服务入口</h2>
+    <div id="svcList"></div>
+  </div>
+
+  <div class="card">
+    <h2>连接配置</h2>
+    <div class="field">
+      <label>内网地址（局域网 / 同 Wi-Fi）</label>
+      <input type="text" id="lan" placeholder="http://192.168.1.10:5700" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>外网地址（IPv6 或域名）</label>
+      <input type="text" id="wan" placeholder="https://ql.example.com" spellcheck="false">
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>面板账号</label>
+      <input type="text" id="user" placeholder="admin" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>面板密码</label>
+      <input type="password" id="pass" placeholder="用于自动填充登录表单">
+    </div>
+    <div class="sw">
+      <span>页面加载后自动填充账号密码</span>
+      <input type="checkbox" id="autofill" checked>
+    </div>
+    <div class="hint">凭据经 Android Keystore 加密后仅存本机；地址留空则跳过对应线路。</div>
+    <div class="row">
+      <button class="ghost" id="btnProbe">探测线路</button>
+      <button id="btnSave">保存配置</button>
+    </div>
+  </div>
+
+  <div class="hint" style="text-align:center;margin-top:18px">
+    DVM Kit · 把安卓手机变成服务器的控制台
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const DEFAULT_SVC = [
+  { name: "青龙面板", desc: "定时任务 / 脚本 / 环境变量", path: "", port: 5700, color: "linear-gradient(135deg,#a855f7,#ec4899)", icon: "QL" },
+  { name: "更新中心", desc: "多项目检查 / 更新 / 回滚", path: "/ag2a/", port: 3077, color: "linear-gradient(135deg,#38bdf8,#6366f1)", icon: "PU" },
+  { name: "状态面板", desc: "电量 / 温度 / 服务健康", path: "/", port: 8765, color: "linear-gradient(135deg,#34d399,#10b981)", icon: "DV" }
+];
+
+let cfg = { lan: "", wan: "", user: "", pass: "", autofill: true, services: DEFAULT_SVC };
+let activeBase = "";
+
+function toast(msg) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 1900);
+}
+
+function normalize(u) {
+  u = (u || "").trim();
+  if (!u) return "";
+  if (!/^https?:\/\//i.test(u)) u = "http://" + u;
+  return u.replace(/\/+$/, "");
+}
+
+function loadCfg() {
+  try {
+    const raw = window.DvmApp ? DvmApp.getConfig() : "{}";
+    const o = JSON.parse(raw || "{}");
+    cfg = Object.assign(cfg, o);
+  } catch (e) { /* 首次运行 */ }
+  $("lan").value = cfg.lan || "";
+  $("wan").value = cfg.wan || "";
+  $("user").value = cfg.user || "";
+  $("pass").value = cfg.pass || "";
+  $("autofill").checked = cfg.autofill !== false;
+  renderServices();
+}
+
+function saveCfg() {
+  cfg.lan = normalize($("lan").value);
+  cfg.wan = normalize($("wan").value);
+  cfg.user = $("user").value.trim();
+  cfg.pass = $("pass").value;
+  cfg.autofill = $("autofill").checked;
+  try {
+    DvmApp.saveConfig(JSON.stringify(cfg));
+    toast("已保存");
+    probe();
+  } catch (e) {
+    toast("保存失败：" + e.message);
+  }
+}
+
+function renderServices() {
+  const list = cfg.services && cfg.services.length ? cfg.services : DEFAULT_SVC;
+  $("svcList").innerHTML = list.map((s, i) => `
+    <div class="svc" data-i="${i}">
+      <div class="ic" style="background:${s.color}">${s.icon || "·"}</div>
+      <div class="tx">
+        <div class="nm">${s.name}</div>
+        <div class="ds">${s.desc || ""}</div>
+      </div>
+      <div class="go">打开 ›</div>
+    </div>`).join("");
+  $("svcList").querySelectorAll(".svc").forEach(el => {
+    el.addEventListener("click", () => openService(list[el.dataset.i | 0]));
+  });
+}
+
+function pickBase() {
+  return activeBase || cfg.lan || cfg.wan;
+}
+
+function openService(s) {
+  const base = pickBase();
+  if (!base) { toast("请先填写内网或外网地址"); return; }
+  const path = s.path || "";
+  try {
+    DvmApp.openService(base, path);
+  } catch (e) {
+    toast("打开失败：" + e.message);
+  }
+}
+
+function probe() {
+  const dot = $("dot"), txt = $("netText");
+  dot.className = "dot";
+  txt.textContent = "探测中…";
+  try { DvmApp.probe(); } catch (e) { txt.textContent = "探测不可用"; }
+}
+
+// Kotlin 回调
+window.__probe = function (lanOk, wanOk) {
+  const dot = $("dot"), txt = $("netText");
+  if (lanOk) { activeBase = cfg.lan; dot.className = "dot on"; txt.textContent = "内网"; return; }
+  if (wanOk) { activeBase = cfg.wan; dot.className = "dot wan"; txt.textContent = "外网"; return; }
+  activeBase = "";
+  dot.className = "dot";
+  txt.textContent = "均不可达";
+};
+
+$("btnSave").addEventListener("click", saveCfg);
+$("btnProbe").addEventListener("click", probe);
+
+loadCfg();
+setTimeout(probe, 260);
+</script>
+</body>
+</html>

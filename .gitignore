@@ -1,0 +1,36 @@
+# 运行时产物
+.dvmkit/
+.logs/
+release/
+
+# 凭据与配置（绝不提交）
+*.env
+dvmkit.env
+console/token
+console/work/
+dashboard/token
+signing.properties
+*.jks
+*.keystore
+*.p12
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.iml
+*.apk
+*.aab
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 系统
+.DS_Store
+Thumbs.db
+*.log
