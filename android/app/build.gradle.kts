@@ -24,8 +24,8 @@ android {
         applicationId = "com.dvm.kit"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 7
+        versionName = "1.1.5"
         resValue("string", "app_name", "DVM 控制台")
     }
 

@@ -140,23 +140,24 @@ cat /opt/dashboard/token
 
 ---
 
-## 五、调试用：配置注入
+## 五、配置导入（备份 / 恢复 / 批量部署）
 
-只有 **debug 包**支持，release 包不会读这个参数。
-
-```bash
-# 从文件注入（自动化测试 / 批量分发）
-adb push cfg.json /data/local/tmp/cfg.json
-adb shell run-as com.dvm.kit.debug cp /data/local/tmp/cfg.json files/cfg.json
-adb shell am start -n com.dvm.kit.debug/com.dvm.kit.MainActivity \
-  --es cfgfile /data/data/com.dvm.kit.debug/files/cfg.json
-```
+支持从 App 自己的外部目录导入一份配置 JSON：
 
 ```bash
-# 或直接内联
-adb shell am start -n com.dvm.kit.debug/com.dvm.kit.MainActivity \
-  --es dvmcfg '{"lan":"http://192.168.1.10","wan":"https://dash.example.com","user":"admin","pass":"***"}'
+# 路径必须在 /sdcard/Android/data/<包名>/files/ 下
+adb push cfg.json /sdcard/Android/data/com.dvm.kit/files/dvmcfg.json
+
+adb shell am start -n com.dvm.kit/com.dvm.kit.MainActivity \
+  --es cfgfile /storage/emulated/0/Android/data/com.dvm.kit/files/dvmcfg.json
 ```
+
+也可以在内置的「文件」类应用里把 JSON 放进该目录后自行处理（该目录归 App 所有）。
+
+**为什么只认这个目录**：Android 分区存储下，`/sdcard/Android/data/<包名>/` 只有 adb 和 App 自己能写，
+别的应用写不进去，所以不能被拿去把面板地址改成钓鱼站点。App 还会校验 canonical path 前缀。
+
+`--es dvmcfg '<json>'` 这种内联注入**仅 debug 包**接受，release 包忽略。
 
 配置结构：
 
@@ -180,6 +181,16 @@ adb shell am start -n com.dvm.kit.debug/com.dvm.kit.MainActivity \
   ]
 }
 ```
+
+字段含义：
+
+| 字段 | 说明 |
+|---|---|
+| `path` | **外网**用的路径前缀；内网直连服务时忽略（一律根路径） |
+| `port` | 内网直连端口 |
+| `lanUrl` / `wanUrl` | 该入口的完整地址覆盖，填了就优先用它 |
+| `token` | 该入口的访问令牌（更新中心 / 仪表盘才需要） |
+| `totp` | 该入口的 Base32 TOTP 密钥（开启 2FA 才需要） |
 
 ---
 

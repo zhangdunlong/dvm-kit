@@ -46,6 +46,11 @@ class MainActivity : AppCompatActivity() {
     private var pendingTotp: String = ""
     /** 配置缓存：自愈轮询每 1.5 秒跑一次，不必每次都过一遍 Keystore */
     private var cfgCache: String? = null
+    /** 已提交过的验证码，跨页面切换也要去重：青龙同窗口重复提交会回 450 */
+    private var lastOtpCode: String = ""
+    private var lastOtpAt: Long = 0L
+    /** 最近一次点击提交的时间：登录成功后页面会短暂重渲染出登录框，用它挡掉重复提交 */
+    private var lastSubmitAt: Long = 0L
     private val ui = android.os.Handler(android.os.Looper.getMainLooper())
 
     private fun cfg(): JSONObject {
@@ -80,17 +85,23 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
 
-        // 仅调试包：支持从 Intent 注入配置，便于自动化测试与批量部署
-        if (BuildConfig.DEBUG) {
-            val file = intent?.getStringExtra("cfgfile")
-            val inline = intent?.getStringExtra("dvmcfg")
-            val raw = if (!file.isNullOrBlank()) {
-                runCatching { java.io.File(file).readText() }.getOrNull()
-            } else inline
-            if (!raw.isNullOrBlank()) {
-                runCatching { prefs.save(raw) }
-                Log.i("DvmKit", "config seeded from intent")
-            }
+        // 配置导入：
+        //  - cfgfile 指向 App 自己的外部文件目录（/sdcard/Android/data/<pkg>/files/），
+        //    该目录在分区存储下只有 adb 和 App 自己能写，别的应用写不进去，可用于离线备份/恢复
+        //  - dvmcfg 内联 JSON 仅 debug 包支持，release 不接受，避免被任意 Intent 改写
+        val file = intent?.getStringExtra("cfgfile")
+        val inline = intent?.getStringExtra("dvmcfg")
+        val raw = if (!file.isNullOrBlank()) {
+            val root = getExternalFilesDir(null)?.canonicalPath
+            val path = runCatching { java.io.File(file).canonicalPath }.getOrNull()
+            if (root != null && path != null && path.startsWith(root)) {
+                runCatching { java.io.File(path).readText() }.getOrNull()
+            } else null
+        } else if (BuildConfig.DEBUG) inline else null
+        if (!raw.isNullOrBlank()) {
+            runCatching { prefs.save(raw) }
+            cfgCache = raw
+            Log.i("DvmKit", "config imported")
         }
 
         val root = FrameLayout(this)
@@ -187,17 +198,28 @@ class MainActivity : AppCompatActivity() {
         val token = pendingToken.ifBlank { cfg.optString("token") }
         if (user.isBlank() && pass.isBlank() && token.isBlank() && pendingTotp.isBlank()) return
 
-        // 两步验证码：剩余有效期不足 6 秒就留空，等下一个窗口再填，避免刚提交就过期
+        // 两步验证码：剩余有效期不足 6 秒就留空，等下一个窗口再填，避免刚提交就过期。
+        // 同一个码只提交一次（跨页面切换也去重），否则会撞上青龙的重放保护返回 450。
+        // 注意：这里只判断是否允许，不提前记账——真正的记账在 JS 里点击验证按钮那一刻
+        // 通过 DvmApp.noteOtp() 回调，否则会在验证码框还没出现时就把码用掉。
         var code = ""
         if (pendingTotp.isNotBlank()) {
             val pair = runCatching { totp(pendingTotp) }.getOrNull()
-            if (pair != null && pair.second >= 6) code = pair.first
+            if (pair != null && pair.second >= 6) {
+                val c = pair.first
+                val blocked = c == lastOtpCode && System.currentTimeMillis() - lastOtpAt < 25_000L
+                if (!blocked) code = c
+            }
         }
+
+        // 2.5 秒冷却：只挡点击，不挡填写；足够盖住登录成功后的短暂重渲染
+        val allow = System.currentTimeMillis() - lastSubmitAt >= 2500L
 
         val js = """
             (function(){
               var U=${JSONObject.quote(user)}, P=${JSONObject.quote(pass)};
               var T=${JSONObject.quote(token)}, C=${JSONObject.quote(code)};
+              var A=$allow;
               var now=Date.now();
 
               function setv(el,v){
@@ -216,12 +238,14 @@ class MainActivity : AppCompatActivity() {
               }
               // 同一 key 8 秒内只点一次；验证码的 key 含码值，换窗口后自然可重试
               function submit(key,re){
+                if(!A) return;
                 window.__dvmSent=window.__dvmSent||{};
                 var last=window.__dvmSent[key]||0;
                 if(now-last<8000) return;
                 var b=findBtn(re);
                 if(!b) return;
                 window.__dvmSent[key]=now;
+                try{ DvmApp.noteSubmit(); }catch(e){}
                 b.click();
               }
 
@@ -244,7 +268,18 @@ class MainActivity : AppCompatActivity() {
               if(otp && !pw){
                 if(!C) return;
                 if(!otp.value) setv(otp,C);
-                if(otp.value===C) submit('otp:'+C,RE_LOGIN);
+                if(otp.value===C){
+                  window.__dvmSent=window.__dvmSent||{};
+                  var k='otp:'+C, last=window.__dvmSent[k]||0;
+                  if(A && now-last>=8000){
+                    var b=findBtn(RE_LOGIN);
+                    if(b){
+                      window.__dvmSent[k]=now;
+                      try{ DvmApp.noteOtp(C); DvmApp.noteSubmit(); }catch(e){}
+                      b.click();
+                    }
+                  }
+                }
                 return;
               }
 
@@ -408,6 +443,18 @@ class MainActivity : AppCompatActivity() {
             pendingToken = token.trim()
             pendingTotp = totp.trim()
             runOnUiThread { web.loadUrl(u) }
+        }
+
+        @JavascriptInterface
+        fun noteSubmit() {
+            lastSubmitAt = System.currentTimeMillis()
+        }
+
+        /** 页面真的点了「验证」才记账，避免码还没用上就被去重逻辑挡住 */
+        @JavascriptInterface
+        fun noteOtp(code: String) {
+            lastOtpCode = code
+            lastOtpAt = System.currentTimeMillis()
         }
 
         @JavascriptInterface
