@@ -61,14 +61,18 @@
   .svc{display:flex;align-items:center;gap:12px;padding:14px 15px;border-radius:14px;
        border:1px solid var(--line);background:var(--card);margin-bottom:10px;
        cursor:pointer;transition:.15s}
+  .svc:last-child{margin-bottom:0}
   .svc:active{transform:scale(.985);opacity:.85}
   .svc .ic{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:flex;
            align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff}
   .svc .tx{flex:1;min-width:0}
-  .svc .nm{font-size:14px;font-weight:600;margin-bottom:2px}
+  .svc .nm{font-size:14px;font-weight:600;margin-bottom:3px}
   .svc .ds{font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .svc .url{font-size:10.5px;color:#7f78a0;overflow:hidden;text-overflow:ellipsis;
+            white-space:nowrap;margin-top:3px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .svc .url.ok{color:rgba(52,211,153,.85)}
   .svc .go{font-size:11.5px;color:var(--pur);flex:0 0 auto}
-  .svc.dim{opacity:.5}
+  .svc.dim{opacity:.45}
   .hint{font-size:11px;color:var(--dim);line-height:1.6;margin-top:8px}
   .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);
          background:rgba(28,22,46,.96);border:1px solid var(--line);color:var(--txt);
@@ -76,6 +80,17 @@
          transition:.22s;pointer-events:none;z-index:99;max-width:86vw;text-align:center}
   .toast.show{opacity:1;transform:translate(-50%,0)}
   .sep{height:1px;background:var(--line);margin:14px 0}
+  details{border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+          background:rgba(255,255,255,.03)}
+  summary{font-size:12px;color:var(--dim);cursor:pointer;outline:none;letter-spacing:.5px}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"›  ";color:var(--pur)}
+  details[open] summary::before{content:"⌄  "}
+  .ov{margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+  .ov:first-of-type{border-top:0;padding-top:0}
+  .ov h3{font-size:12px;margin:0 0 8px;color:#c9c3e0;font-weight:600}
+  .ov .field{margin-bottom:8px}
+  .ov input{font-size:12px;padding:9px 10px}
 </style>
 </head>
 <body>
@@ -93,12 +108,12 @@
   <div class="card">
     <h2>连接配置</h2>
     <div class="field">
-      <label>内网地址（局域网 / 同 Wi-Fi）</label>
-      <input type="text" id="lan" placeholder="http://192.168.1.10:5700" spellcheck="false">
+      <label>内网地址（局域网 / 同 Wi-Fi，填主机即可）</label>
+      <input type="text" id="lan" placeholder="http://192.168.1.10" spellcheck="false">
     </div>
     <div class="field">
       <label>外网地址（IPv6 或域名）</label>
-      <input type="text" id="wan" placeholder="https://ql.example.com" spellcheck="false">
+      <input type="text" id="wan" placeholder="https://dash.example.com" spellcheck="false">
     </div>
     <div class="field" style="margin-top:12px">
       <label>面板账号</label>
@@ -109,14 +124,23 @@
       <input type="password" id="pass" placeholder="用于自动填充登录表单">
     </div>
     <div class="sw">
-      <span>页面加载后自动填充账号密码</span>
+      <span>页面加载后自动填充凭据</span>
       <input type="checkbox" id="autofill" checked>
     </div>
-    <div class="hint">凭据经 Android Keystore 加密后仅存本机；地址留空则跳过对应线路。</div>
+    <div class="hint">内网地址只填主机（如 <code>http://192.168.1.10</code>），各服务端口按入口自动补全；
+      外网若三个入口同域名，也只需填主域名。更新中心 / 状态面板的访问令牌在下方「高级」里按入口单独填。</div>
     <div class="row">
       <button class="ghost" id="btnProbe">探测线路</button>
       <button id="btnSave">保存配置</button>
     </div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>高级：自定义各入口地址</summary>
+      <div id="ovList"></div>
+      <div class="hint">留空表示按上面的规则自动拼接。青龙与更新中心不同域名时，在这里单独指定。</div>
+    </details>
   </div>
 
   <div class="hint" style="text-align:center;margin-top:18px">
@@ -128,106 +152,257 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+
 const DEFAULT_SVC = [
-  { name: "青龙面板", desc: "定时任务 / 脚本 / 环境变量", path: "", port: 5700, color: "linear-gradient(135deg,#a855f7,#ec4899)", icon: "QL" },
-  { name: "更新中心", desc: "多项目检查 / 更新 / 回滚", path: "/ag2a/", port: 3077, color: "linear-gradient(135deg,#38bdf8,#6366f1)", icon: "PU" },
-  { name: "状态面板", desc: "电量 / 温度 / 服务健康", path: "/", port: 8765, color: "linear-gradient(135deg,#34d399,#10b981)", icon: "DV" }
+  { name:"青龙面板", desc:"定时任务 / 脚本 / 环境变量", path:"",      port:5700,
+    color:"linear-gradient(135deg,#a855f7,#ec4899)", icon:"QL", lanUrl:"", wanUrl:"", token:"", totp:"" },
+  { name:"更新中心", desc:"多项目检查 / 更新 / 回滚",  path:"/ag2a/", port:3077,
+    color:"linear-gradient(135deg,#38bdf8,#6366f1)", icon:"PU", lanUrl:"", wanUrl:"", token:"", totp:"" },
+  { name:"状态面板", desc:"电量 / 温度 / 服务健康",    path:"/",      port:8765,
+    color:"linear-gradient(135deg,#34d399,#10b981)", icon:"DV", lanUrl:"", wanUrl:"", token:"", totp:"" }
 ];
 
-let cfg = { lan: "", wan: "", user: "", pass: "", autofill: true, services: DEFAULT_SVC };
-let activeBase = "";
+let cfg = { lan:"", wan:"", user:"", pass:"", autofill:true, services:null };
+let mode = "";          // "" | "lan" | "wan"
+let hitUrl = "";        // 本次探测命中的 URL
 
-function toast(msg) {
+/* ---------------- 基础工具 ---------------- */
+
+function toast(msg){
   const el = $("toast");
   el.textContent = msg;
   el.classList.add("show");
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove("show"), 1900);
+  el._t = setTimeout(()=>el.classList.remove("show"), 1900);
 }
 
-function normalize(u) {
-  u = (u || "").trim();
-  if (!u) return "";
-  if (!/^https?:\/\//i.test(u)) u = "http://" + u;
-  return u.replace(/\/+$/, "");
+function norm(u){
+  u = (u||"").trim();
+  if(!u) return "";
+  if(!/^https?:\/\//i.test(u)) u = "http://" + u;
+  u = u.replace(/\/+$/,"");
+  // 带路径前缀的地址必须保留结尾斜杠，否则 /ag2a 会被反代当成另一个站点
+  try{
+    const x = new URL(u);
+    const seg = (x.pathname || "").split("/").filter(Boolean).pop() || "";
+    if(x.pathname && x.pathname !== "/" && seg.indexOf(".") < 0) u += "/";
+  }catch(e){ /* 非法 URL 原样返回 */ }
+  return u;
 }
 
-function loadCfg() {
-  try {
-    const raw = window.DvmApp ? DvmApp.getConfig() : "{}";
-    const o = JSON.parse(raw || "{}");
-    cfg = Object.assign(cfg, o);
-  } catch (e) { /* 首次运行 */ }
-  $("lan").value = cfg.lan || "";
-  $("wan").value = cfg.wan || "";
-  $("user").value = cfg.user || "";
-  $("pass").value = cfg.pass || "";
-  $("autofill").checked = cfg.autofill !== false;
-  renderServices();
+function hostOf(u){
+  try{ const x = new URL(u); return x.protocol + "//" + x.hostname + (x.port ? ":"+x.port : ""); }
+  catch(e){ return u; }
+}
+function schemeOf(u){
+  try{ return new URL(u).protocol; }catch(e){ return "http:"; }
+}
+function hostnameOf(u){
+  try{ return new URL(u).hostname; }catch(e){ return ""; }
 }
 
-function saveCfg() {
-  cfg.lan = normalize($("lan").value);
-  cfg.wan = normalize($("wan").value);
-  cfg.user = $("user").value.trim();
-  cfg.pass = $("pass").value;
-  cfg.autofill = $("autofill").checked;
-  try {
-    DvmApp.saveConfig(JSON.stringify(cfg));
-    toast("已保存");
-    probe();
-  } catch (e) {
-    toast("保存失败：" + e.message);
+/* ---------------- 地址解析 ---------------- */
+
+/**
+ * 解析某个入口在某条线路上的实际地址。
+ *  lan: 优先 s.lanUrl；否则 协议+主机+端口+/（内网直连服务根路径，靠端口区分服务）
+ *  wan: 优先 s.wanUrl；否则 外网基址 + path（外网走反代，靠域名/前缀区分服务）
+ */
+function resolveUrl(s, m){
+  const ov = norm(m === "lan" ? (s.lanUrl||"") : (s.wanUrl||""));
+  if(ov) return ov;
+
+  const base = norm(m === "lan" ? cfg.lan : cfg.wan);
+  if(!base) return "";
+
+  if(m === "lan"){
+    // 内网直连：服务都挂在根路径
+    return s.port
+      ? schemeOf(base) + "//" + hostnameOf(base) + ":" + s.port + "/"
+      : base + "/";
   }
+  return base + (s.path || "");
 }
 
-function renderServices() {
-  const list = cfg.services && cfg.services.length ? cfg.services : DEFAULT_SVC;
-  $("svcList").innerHTML = list.map((s, i) => `
-    <div class="svc" data-i="${i}">
-      <div class="ic" style="background:${s.color}">${s.icon || "·"}</div>
+function svcList(){
+  const l = cfg.services;
+  if(!l || !l.length) return DEFAULT_SVC;
+  // 兼容旧配置：补齐缺失字段
+  return l.map(s => Object.assign({
+    path:"", port:0, color:"#666", icon:"·", lanUrl:"", wanUrl:"", token:"", totp:""
+  }, s));
+}
+
+/* ---------------- 渲染 ---------------- */
+
+function renderServices(){
+  const list = svcList();
+  const url = mode ? resolveUrl(list[0], mode) : "";
+  $("svcList").innerHTML = list.map((s,i)=>{
+    const u = mode ? resolveUrl(s, mode) : (resolveUrl(s,"lan") || resolveUrl(s,"wan"));
+    const cls = (mode && u) ? "url ok" : "url";
+    const shown = u || (mode ? "该线路未配置" : "未配置地址");
+    return `
+    <div class="svc ${u?'':'dim'}" data-i="${i}">
+      <div class="ic" style="background:${s.color}">${s.icon||"·"}</div>
       <div class="tx">
         <div class="nm">${s.name}</div>
-        <div class="ds">${s.desc || ""}</div>
+        <div class="ds">${s.desc||""}</div>
+        <div class="${cls}">${shown}</div>
       </div>
       <div class="go">打开 ›</div>
-    </div>`).join("");
-  $("svcList").querySelectorAll(".svc").forEach(el => {
-    el.addEventListener("click", () => openService(list[el.dataset.i | 0]));
+    </div>`;
+  }).join("");
+  $("svcList").querySelectorAll(".svc").forEach(el=>{
+    el.addEventListener("click", ()=> openService(svcList()[el.dataset.i|0]));
   });
 }
 
-function pickBase() {
-  return activeBase || cfg.lan || cfg.wan;
+function renderOverrides(){
+  $("ovList").innerHTML = svcList().map((s,i)=>{
+    const autoLan = resolveUrl({...s, lanUrl:""}, "lan");
+    const autoWan = resolveUrl({...s, wanUrl:""}, "wan");
+    return `
+    <div class="ov" data-i="${i}">
+      <h3>${s.name}</h3>
+      <div class="field">
+        <label>内网地址</label>
+        <input type="text" id="ol${i}" value="${s.lanUrl||""}"
+               placeholder="${autoLan||"http://192.168.1.10:"+(s.port||"")}" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>外网地址</label>
+        <input type="text" id="ow${i}" value="${s.wanUrl||""}"
+               placeholder="${autoWan||"https://example.com"}" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>访问令牌（需要登录的服务才填）</label>
+        <input type="password" id="ot${i}" value="${s.token||""}"
+               placeholder="X-Console-Token / 仪表盘令牌" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>两步验证密钥 TOTP（开启 2FA 才填）</label>
+        <input type="password" id="op${i}" value="${s.totp||""}"
+               placeholder="Base32 密钥，如 JBSWY3DPEHPK3PXP" spellcheck="false">
+      </div>
+    </div>`;
+  }).join("");
 }
 
-function openService(s) {
-  const base = pickBase();
-  if (!base) { toast("请先填写内网或外网地址"); return; }
-  const path = s.path || "";
-  try {
-    DvmApp.openService(base, path);
-  } catch (e) {
-    toast("打开失败：" + e.message);
+/* ---------------- 配置读写 ---------------- */
+
+function loadCfg(){
+  try{
+    const raw = window.DvmApp ? DvmApp.getConfig() : "{}";
+    const o = JSON.parse(raw || "{}");
+    cfg = Object.assign(cfg, o);
+  }catch(e){ /* 首次运行 */ }
+
+  $("lan").value   = cfg.lan || "";
+  $("wan").value   = cfg.wan || "";
+  $("user").value  = cfg.user || "";
+  $("pass").value  = cfg.pass || "";
+  $("autofill").checked = cfg.autofill !== false;
+
+  renderOverrides();
+  renderServices();
+}
+
+function collect(){
+  const list = svcList();
+  const out = list.map((s,i)=>{
+    const el = $("ol"+i), ew = $("ow"+i), et = $("ot"+i), ep = $("op"+i);
+    return Object.assign({}, s, {
+      lanUrl: el ? norm(el.value) : (s.lanUrl||""),
+      wanUrl: ew ? norm(ew.value) : (s.wanUrl||""),
+      token:  et ? et.value.trim() : (s.token||""),
+      totp:   ep ? ep.value.replace(/\s+/g,"").toUpperCase() : (s.totp||"")
+    });
+  });
+  return {
+    lan: norm($("lan").value),
+    wan: norm($("wan").value),
+    user: $("user").value.trim(),
+    pass: $("pass").value,
+    autofill: $("autofill").checked,
+    services: out
+  };
+}
+
+function saveCfg(){
+  const next = collect();
+  if(!next.lan && !next.wan){
+    toast("请至少填写内网或外网地址");
+    return;
+  }
+  cfg = Object.assign({}, cfg, next);
+  try{
+    DvmApp.saveConfig(JSON.stringify(cfg));
+    toast("已保存");
+    renderOverrides();
+    renderServices();
+    mode = ""; hitUrl = "";
+    probe();
+  }catch(e){
+    toast("保存失败："+e.message);
   }
 }
 
-function probe() {
+/* ---------------- 探测 ---------------- */
+
+function candidates(m){
+  return svcList().map(s => resolveUrl(s,m)).filter(Boolean);
+}
+
+function probe(){
   const dot = $("dot"), txt = $("netText");
   dot.className = "dot";
   txt.textContent = "探测中…";
-  try { DvmApp.probe(); } catch (e) { txt.textContent = "探测不可用"; }
+  mode = ""; hitUrl = "";
+  renderServices();
+
+  const lan = candidates("lan"), wan = candidates("wan");
+  if(!lan.length && !wan.length){
+    txt.textContent = "未配置";
+    toast("请先填写地址并保存");
+    return;
+  }
+  try{
+    DvmApp.probeMany(JSON.stringify({lan, wan}));
+  }catch(e){
+    txt.textContent = "探测不可用";
+  }
 }
 
 // Kotlin 回调
-window.__probe = function (lanOk, wanOk) {
+window.__probeResult = function(lanOk, wanOk){
   const dot = $("dot"), txt = $("netText");
-  if (lanOk) { activeBase = cfg.lan; dot.className = "dot on"; txt.textContent = "内网"; return; }
-  if (wanOk) { activeBase = cfg.wan; dot.className = "dot wan"; txt.textContent = "外网"; return; }
-  activeBase = "";
-  dot.className = "dot";
-  txt.textContent = "均不可达";
+  if(lanOk){
+    mode = "lan"; dot.className = "dot on"; txt.textContent = "内网";
+  }else if(wanOk){
+    mode = "wan"; dot.className = "dot wan"; txt.textContent = "外网";
+  }else{
+    mode = ""; dot.className = "dot"; txt.textContent = "均不可达";
+  }
+  renderServices();
 };
+// 兼容旧回调名
+window.__probe = function(lanOk, wanOk){ window.__probeResult(lanOk, wanOk); };
+
+/* ---------------- 打开入口 ---------------- */
+
+function openService(s){
+  if(!mode) mode = (cfg.lan ? "lan" : (cfg.wan ? "wan" : ""));
+  let u = mode ? resolveUrl(s, mode) : "";
+  if(!u) u = resolveUrl(s, "lan") || resolveUrl(s, "wan");
+
+  if(!u){ toast("请先配置地址"); return; }
+  try{
+    DvmApp.open(u, s.token || "", s.totp || "");
+  }catch(e){
+    toast("打开失败："+e.message);
+  }
+}
 
 $("btnSave").addEventListener("click", saveCfg);
 $("btnProbe").addEventListener("click", probe);

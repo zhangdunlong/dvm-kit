@@ -3,6 +3,9 @@
 .logs/
 release/
 
+# 本地测试与配置样本（含真实地址/令牌，绝不提交）
+_test/
+
 # 凭据与配置（绝不提交）
 *.env
 dvmkit.env

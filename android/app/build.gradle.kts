@@ -24,8 +24,8 @@ android {
         applicationId = "com.dvm.kit"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         resValue("string", "app_name", "DVM 控制台")
     }
 
@@ -44,7 +44,10 @@ android {
         getByName("release") {
             isMinifyEnabled = false
             isShrinkResources = false
-            if (hasReleaseKey) signingConfig = signingConfigs.getByName("release")
+            // 有正式密钥就用正式密钥；没有则用 debug 密钥签名，
+            // 保证 assembleRelease 产物可直接安装试用（仅限自用，勿用于商店分发）
+            signingConfig = if (hasReleaseKey) signingConfigs.getByName("release")
+                            else signingConfigs.getByName("debug")
         }
         getByName("debug") {
             applicationIdSuffix = ".debug"

@@ -172,17 +172,25 @@ curl -s -o /dev/null -w "%{http_code}\n" https://dash.example.com/
 APK 在 `release/` 目录，或让用户自己构建：
 
 ```bash
-cd android && ./gradlew assembleDebug
+cd android && ./gradlew assembleRelease     # 产物在 app/build/outputs/apk/release/
 ```
 
 装好后在 App 里填：
-- 内网地址：`http://<手机局域网IP>:5700`
-- 外网地址：`https://ql.example.com`
-- 账号密码
 
-App 会自动探测哪条线通。
+- **内网地址**：只填主机，如 `http://192.168.1.10`（端口由各入口自带 5700 / 3077 / 8765）
+- **外网地址**：如 `https://dash.example.com`
+- **账号密码**
+
+然后展开「高级：自定义各入口地址」，按实际情况补：
+
+- 青龙若独立子域（`https://ql.example.com`）→ 填在青龙的「外网地址」
+- 更新中心与仪表盘各自的**访问令牌**（分别在 `/opt/ag2a-console/token`、`/opt/dashboard/token`）
+- 青龙开了 2FA → 填 **TOTP 密钥**（Base32），App 会自动算 6 位码并提交
+
+App 会并行探测两条线路，取先通的；右上角显示「内网 / 外网 / 均不可达」。
 
 **注意**：部分国产 ROM（ColorOS / HyperOS）默认禁止 ADB 静默安装，需要用户手动点安装包确认。
+完整说明见 [docs/05-app.md](docs/05-app.md)。
 
 ---
 
